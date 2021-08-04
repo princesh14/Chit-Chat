@@ -1,93 +1,80 @@
+
+
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.net.InetAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.util.ArrayList;
+import java.net.*;
 
-public class SocketServer {
+public class ServerSide {
+
     ServerSocket server;
-    Socket sk;
-    InetAddress addr;
-    
-    ArrayList<ServerThread> list = new ArrayList<ServerThread>();
+    Socket socket;
+    BufferedReader br;
+    PrintWriter out;
+     public ServerSide(){
+try{
+    server = new ServerSocket(7777);
+    System.out.println("server is ready to accept a connection");
+    System.out.println("waiting");
+    socket=server.accept();
+    br = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+    out = new PrintWriter(socket.getOutputStream());
 
-    public SocketServer() {
-        try {
-        	addr = InetAddress.getByName("127.0.0.1");
-        	//addr = InetAddress.getByName("192.168.43.1");
-            
-        	server = new ServerSocket(1234,50,addr);
-            System.out.println("\n Waiting for Client connection");
-            SocketClient.main(null);
-            while(true) {
-                sk = server.accept();
-                System.out.println(sk.getInetAddress() + " connect");
-
-                //Thread connected clients to ArrayList
-                ServerThread st = new ServerThread(this);
-                addThread(st);
-                st.start();
-            }
-        } catch(IOException e) {
-            System.out.println(e + "-> ServerSocket failed");
-        }
+    startReading();
+    startWriting();
+}
+catch (Exception e){
+    e.printStackTrace();
     }
+     }
+     public void startReading(){
 
-    public void addThread(ServerThread st) {
-        list.add(st);
-    }
+         Runnable r1 = ()->{
+             System.out.println("Reader Started");
+             while (true){
+                 try {
+                     String msg = br.readLine();
+                     if (msg.equals("exit")) {
+                         System.out.println("Client terminated the chat");
 
-    public void removeThread(ServerThread st){
-        list.remove(st); //remove
-    }
+                         break;
+                     }
+                     System.out.println("Client : " + msg);
+                 }
+                 catch (Exception e){
+                     e.printStackTrace();
+                 }
+             }
 
-    public void broadCast(String message){
-        for(ServerThread st : list){
-            st.pw.println(message);
-        }
-    }
+         };
+         new Thread(r1).start();
+
+     }
+     public void startWriting(){
+         Runnable r2 = () -> {
+             System.out.println("writer started");
+
+             while (true){
+                 try{
+               BufferedReader br1 = new BufferedReader(new InputStreamReader(System.in));
+                String content = br1.readLine();
+                out.println(content);
+                out.flush();
+
+                 }
+                 catch (Exception e){
+                     e.printStackTrace();
+                 }
+             }
+         };
+         new Thread(r2).start();
+
+     }
+
 
     public static void main(String[] args) {
-        new SocketServer();
-    }
-}
+        System.out.println("This is Server.. Going to start a server");
+        new ServerSide();
 
-class ServerThread extends Thread {
-    SocketServer server;
-    PrintWriter pw;
-    String name;
-
-    public ServerThread(SocketServer server) {
-        this.server = server;
-    }
-
-    @Override
-    public void run() {
-        try {
-            // read
-            BufferedReader br = new BufferedReader(new InputStreamReader(server.sk.getInputStream()));
-
-            // writing
-            pw = new PrintWriter(server.sk.getOutputStream(), true);
-            name = br.readLine();
-            server.broadCast("**["+name+"] Entered**");
-
-            String data;
-            while((data = br.readLine()) != null ){
-                if(data == "/list"){
-                    pw.println("a");
-                }
-                server.broadCast("["+name+"] "+ data);
-            }
-        } catch (Exception e) {
-            //Remove the current thread from the ArrayList.
-            server.removeThread(this);
-            server.broadCast("**["+name+"] Left**");
-            System.out.println(server.sk.getInetAddress()+" - ["+name+"] Exit");
-            System.out.println(e + "---->");
-        }
     }
 }
